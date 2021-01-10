@@ -64,11 +64,9 @@ namespace Miyabi.Tests.SCs
             {
                 return;
             }
-
-
             string registinfo = ParticipateAddress.ToString() +"_"+ Eventname;
             //すでに登録されているかチェック
-            if (managementTable.TryGetValue(ByteString.Parse(registinfo), out var value))
+            if (managementTable.TryGetValue(ByteString.Encode(registinfo), out var value))
             {
                 return;
             }
@@ -95,7 +93,6 @@ namespace Miyabi.Tests.SCs
             {
                 return;
             }
-
             var Votetable = GetVoteTableName();
             if (!StateWriter.TryGetTableWriter<IAssetTableWriter>(Votetable, out var votetable))
             {
@@ -105,6 +102,13 @@ namespace Miyabi.Tests.SCs
             votetable.MoveValue(contractaddress, RequesterAddress, votenum);
         }
 
+        /// <summary>
+        /// vote method (指定ターゲットに投票をする)
+        /// </summary>
+        /// <param name="voteraddress"></param>
+        /// <param name="votetargetAddress"></param>
+        /// <param name="Eventname"></param>
+        /// <param name="votenum"></param>
         public void vote(Address voteraddress,Address votetargetAddress,string Eventname,decimal votenum)
         {
             int i;
@@ -119,24 +123,24 @@ namespace Miyabi.Tests.SCs
             {
                 return;
             }
-            //イベント情報と投票先ターゲットの紹介
-            if(!votemanageTable.TryGetValue(ByteString.Encode(Eventname),out var targetnum))
+            //イベント情報と投票先ターゲットの照会
+            if (!votemanageTable.TryGetValue(ByteString.Encode(Eventname),out var targetnum))
             {
                 return;
             }
-            int targetnumber = Convert.ToInt32(targetnum.Decode());
-            for(i=0;i<=targetnumber-1;i++)
+            int targetnumber = Convert.ToInt32(targetnum.ToString());
+            for(i=1;i<=targetnumber;i++)
             {
-                votemanageTable.TryGetValue(ByteString.Encode(Eventname + Convert.ToString(i + 1)), out var address);
+                votemanageTable.TryGetValue(ByteString.Encode(Eventname + "_target" + Convert.ToString(i)), out var address);
                 var confirmaddress = PublicKeyAddress.Decode(address);
-                if(votetargetAddress == confirmaddress)
-                {
-                    break;
-                }
-                else if(i == targetnumber-1)
+                if((votetargetAddress != confirmaddress) && i==targetnumber)
                 {
                     return;
                 }
+                else if(votetargetAddress == confirmaddress)
+                {
+                    break;
+                } 
             }
             var Votetable = GetVoteTableName();
             if (!StateWriter.TryGetTableWriter<IAssetTableWriter>(Votetable, out var votetable))
@@ -165,22 +169,12 @@ namespace Miyabi.Tests.SCs
         }
 
         /// <summary>
-        /// RegistIssuanceRight method(票の発行権を持つアドレスを登録)
-        /// </summary>
-        /// <param name="InheritanceAddress"></param>
-        public void RegistIssuanceRight(Address IssuanceRightAddress)
-        {
-
-            SetInternalValue( ByteString.Encode ("Issuance_Right"), IssuanceRightAddress.Encoded);
-        }
-
-        /// <summary>
         /// registvotetarget(投票イベントの登録)
         /// </summary>
         /// <param name="votetargetAddress"></param>
         /// <param name="Eventname"></param>
         /// <param name="votetargetnum"></param>
-        public void registvotetarget(Address[] votetargetAddress,string Eventname ,int votetargetnum)
+        public void registvotetarget(Address votetargetAddress,string Eventname )
         {
             int i;
             var votemanagetable = GetVoteManagementTableName();
@@ -188,17 +182,32 @@ namespace Miyabi.Tests.SCs
             {
                 return;
             }
-            //イベントデータをKeyとした時の情報の有無を確認あればデータ登録はしない
+            //イベントデータをKeyとした時の情報の有無に合わせて処理を変える
             if (managetable.TryGetValue(ByteString.Encode(Eventname),out var value))
             {
-                return;
+                var votetargetnum = Convert.ToInt32(value.ToString());
+                votetargetnum++;
+                managetable.SetValue(ByteString.Encode(Eventname + "_target" +(Convert.ToString(votetargetnum))), votetargetAddress.Encoded);
+                managetable.DeleteValue(ByteString.Encode(Eventname));
+                managetable.SetValue(ByteString.Encode(Eventname), ByteString.Encode(Convert.ToString(votetargetnum)));
             }
-            string num = Convert.ToString(votetargetnum);
-            managetable.SetValue(ByteString.Encode(Eventname), ByteString.Encode(num));
-            for(i=0;i<=votetargetnum-1;i++)
+            else
             {
-                managetable.SetValue(ByteString.Encode(Eventname + Convert.ToString(i + 1)), votetargetAddress[i].Encoded);
+                int votetagetnum = 1;
+                string setvalue = Convert.ToString(votetagetnum);
+                managetable.SetValue(ByteString.Encode(Eventname + "_target" + setvalue), votetargetAddress.Encoded);
+                managetable.SetValue(ByteString.Encode(Eventname), ByteString.Encode(Convert.ToString(setvalue)));
             }
+        }
+
+        /// <summary>
+        /// RegistIssuanceRight method(票の発行権を持つアドレスを登録)
+        /// </summary>
+        /// <param name="InheritanceAddress"></param>
+        public void RegistIssuanceRight(Address IssuanceRightAddress)
+        {
+
+            SetInternalValue(ByteString.Encode("Issuance_Right"), IssuanceRightAddress.Encoded);
         }
 
         /// <summary>
